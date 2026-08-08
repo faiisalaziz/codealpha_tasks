@@ -1,183 +1,194 @@
-const expressionDisplay = document.getElementById("expression");
-const resultDisplay = document.getElementById("result");
-const keys = document.querySelector(".keys");
+const songs = [
+  {
+    title: "Midnight Echo",
+    artist: "Nova Bloom",
+    src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
+    cover: "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    title: "Neon Skyline",
+    artist: "Aurora Lane",
+    src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
+    cover: "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=900&q=80",
+  },
+  {
+    title: "Sunset Drift",
+    artist: "Harbor Kids",
+    src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
+    cover: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?auto=format&fit=crop&w=900&q=80",
+  },
+];
 
-const operators = ["+", "-", "*", "/", "%"];
-let expression = "";
-let justCalculated = false;
+const audioPlayer = document.getElementById("audioPlayer");
+const songTitle = document.getElementById("songTitle");
+const songArtist = document.getElementById("songArtist");
+const coverArt = document.getElementById("coverArt");
+const currentTimeEl = document.getElementById("currentTime");
+const totalTimeEl = document.getElementById("totalTime");
+const progressBar = document.getElementById("progressBar");
+const volumeControl = document.getElementById("volumeControl");
+const playlistContainer = document.getElementById("playlist");
+const playPauseButton = document.getElementById("playPauseButton");
+const prevButton = document.getElementById("prevButton");
+const nextButton = document.getElementById("nextButton");
+const autoplayToggle = document.getElementById("autoplayToggle");
 
-function formatExpression(value) {
-  return value
-    .replace(/\*/g, "×")
-    .replace(/\//g, "÷")
-    .replace(/-/g, "−");
-}
+let currentIndex = 0;
+let isPlaying = false;
+let autoplayEnabled = true;
 
-function formatNumber(value) {
-  if (!Number.isFinite(value)) {
-    return "Cannot divide by 0";
+function formatTime(timeValue) {
+  if (!Number.isFinite(timeValue) || timeValue < 0) {
+    return "0:00";
   }
 
-  return Number.parseFloat(value.toFixed(10)).toString();
+  const minutes = Math.floor(timeValue / 60);
+  const seconds = Math.floor(timeValue % 60);
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
-function calculate(value) {
-  if (!value || operators.includes(value.at(-1))) {
-    return "";
-  }
+function renderPlaylist() {
+  playlistContainer.innerHTML = songs
+    .map(
+      (song, index) => `
+        <button class="playlist-item ${index === currentIndex ? "active" : ""}" data-index="${index}">
+          <div class="song-meta">
+            <strong>${song.title}</strong>
+            <span>${song.artist}</span>
+          </div>
+          <span class="song-duration">${index === currentIndex ? "Now" : "Play"}</span>
+        </button>
+      `
+    )
+    .join("");
 
-  try {
-    const result = Function(`"use strict"; return (${value})`)();
-    return formatNumber(result);
-  } catch {
-    return "";
-  }
+  playlistContainer.querySelectorAll(".playlist-item").forEach((button) => {
+    button.addEventListener("click", () => {
+      const index = Number(button.dataset.index);
+      loadSong(index, true);
+    });
+  });
 }
 
-function updateDisplay() {
-  const liveResult = calculate(expression);
-  expressionDisplay.textContent = expression ? formatExpression(expression) : "0";
-  resultDisplay.textContent = liveResult || "0";
-}
-
-function appendValue(value) {
-  const lastCharacter = expression.at(-1);
-
-  if (justCalculated && !operators.includes(value)) {
-    expression = "";
-  }
-
-  justCalculated = false;
-
-  if (operators.includes(value)) {
-    if (!expression && value !== "-") {
-      return;
-    }
-
-    if (operators.includes(lastCharacter)) {
-      expression = expression.slice(0, -1) + value;
-    } else {
-      expression += value;
-    }
-
-    updateDisplay();
+function updateProgressUI() {
+  if (!Number.isFinite(audioPlayer.duration) || audioPlayer.duration === 0) {
+    progressBar.value = 0;
     return;
   }
 
-  if (value === ".") {
-    const currentNumber = expression.split(/[+\-*/%]/).pop();
+  const percentage = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+  progressBar.value = percentage;
+  currentTimeEl.textContent = formatTime(audioPlayer.currentTime);
+}
 
-    if (currentNumber.includes(".")) {
-      return;
-    }
+function updateVolumeUI() {
+  audioPlayer.volume = Number(volumeControl.value) / 100;
+}
 
-    if (!currentNumber) {
-      expression += "0";
-    }
+function updateSongDetails() {
+  const song = songs[currentIndex];
+  songTitle.textContent = song.title;
+  songArtist.textContent = song.artist;
+  coverArt.src = song.cover;
+  coverArt.alt = `${song.title} by ${song.artist}`;
+  totalTimeEl.textContent = "0:00";
+}
+
+function loadSong(index, shouldPlay = false) {
+  currentIndex = (index + songs.length) % songs.length;
+  const selectedSong = songs[currentIndex];
+
+  audioPlayer.src = selectedSong.src;
+  audioPlayer.load();
+  updateSongDetails();
+  renderPlaylist();
+
+  if (shouldPlay) {
+    playSong();
+  } else {
+    pauseSong();
   }
-
-  expression += value;
-  updateDisplay();
 }
 
-function clearCalculator() {
-  expression = "";
-  justCalculated = false;
-  updateDisplay();
+function playSong() {
+  audioPlayer.play();
+  isPlaying = true;
+  playPauseButton.textContent = "❚❚";
+  playPauseButton.setAttribute("aria-label", "Pause song");
 }
 
-function deleteLastCharacter() {
-  expression = expression.slice(0, -1);
-  justCalculated = false;
-  updateDisplay();
+function pauseSong() {
+  audioPlayer.pause();
+  isPlaying = false;
+  playPauseButton.textContent = "▶";
+  playPauseButton.setAttribute("aria-label", "Play song");
 }
 
-function finalizeCalculation() {
-  const result = calculate(expression);
+function togglePlayback() {
+  if (isPlaying) {
+    pauseSong();
+  } else {
+    playSong();
+  }
+}
 
-  if (!result || result === "Cannot divide by 0") {
-    resultDisplay.textContent = result || "Error";
+function nextSong() {
+  loadSong(currentIndex + 1, true);
+}
+
+function previousSong() {
+  loadSong(currentIndex - 1, true);
+}
+
+function toggleAutoplay() {
+  autoplayEnabled = !autoplayEnabled;
+  autoplayToggle.classList.toggle("active", autoplayEnabled);
+  autoplayToggle.textContent = `Autoplay: ${autoplayEnabled ? "On" : "Off"}`;
+}
+
+playPauseButton.addEventListener("click", togglePlayback);
+prevButton.addEventListener("click", previousSong);
+nextButton.addEventListener("click", nextSong);
+autoplayToggle.addEventListener("click", toggleAutoplay);
+
+progressBar.addEventListener("input", (event) => {
+  if (!Number.isFinite(audioPlayer.duration) || audioPlayer.duration === 0) {
     return;
   }
 
-  expression = result;
-  justCalculated = true;
-  updateDisplay();
-}
+  const newTime = (Number(event.target.value) / 100) * audioPlayer.duration;
+  audioPlayer.currentTime = newTime;
+  currentTimeEl.textContent = formatTime(newTime);
+});
 
-function flashKey(selector) {
-  const key = document.querySelector(selector);
+volumeControl.addEventListener("input", () => {
+  updateVolumeUI();
+});
 
-  if (!key) {
-    return;
-  }
+playlistContainer.addEventListener("click", (event) => {
+  const button = event.target.closest(".playlist-item");
+  if (!button) return;
 
-  key.classList.add("is-active");
-  window.setTimeout(() => key.classList.remove("is-active"), 120);
-}
+  const index = Number(button.dataset.index);
+  loadSong(index, true);
+});
 
-keys.addEventListener("click", (event) => {
-  const button = event.target.closest("button");
+audioPlayer.addEventListener("loadedmetadata", () => {
+  totalTimeEl.textContent = formatTime(audioPlayer.duration);
+  updateProgressUI();
+});
 
-  if (!button) {
-    return;
-  }
+audioPlayer.addEventListener("timeupdate", updateProgressUI);
 
-  if (button.dataset.value) {
-    appendValue(button.dataset.value);
-  }
-
-  if (button.dataset.action === "clear") {
-    clearCalculator();
-  }
-
-  if (button.dataset.action === "delete") {
-    deleteLastCharacter();
-  }
-
-  if (button.dataset.action === "calculate") {
-    finalizeCalculation();
+audioPlayer.addEventListener("ended", () => {
+  if (autoplayEnabled) {
+    nextSong();
+  } else {
+    pauseSong();
   }
 });
 
-document.addEventListener("keydown", (event) => {
-  const key = event.key;
-
-  if (/^[0-9.]$/.test(key)) {
-    appendValue(key);
-    flashKey(`[data-value="${key}"]`);
-    return;
-  }
-
-  if (operators.includes(key)) {
-    appendValue(key);
-    flashKey(`[data-value="${key}"]`);
-    return;
-  }
-
-  if (key === "x" || key === "X") {
-    appendValue("*");
-    flashKey('[data-value="*"]');
-    return;
-  }
-
-  if (key === "Enter" || key === "=") {
-    event.preventDefault();
-    finalizeCalculation();
-    flashKey('[data-action="calculate"]');
-    return;
-  }
-
-  if (key === "Backspace") {
-    deleteLastCharacter();
-    flashKey('[data-action="delete"]');
-    return;
-  }
-
-  if (key === "Escape" || key.toLowerCase() === "c") {
-    clearCalculator();
-    flashKey('[data-action="clear"]');
-  }
-});
-
-updateDisplay();
+volumeControl.value = 70;
+updateVolumeUI();
+renderPlaylist();
+loadSong(0, false);
